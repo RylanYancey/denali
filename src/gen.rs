@@ -39,7 +39,6 @@ pub fn get_perm(seed: u128) -> [u8; 512] {
 
 const F2: f32 = 0.366025403;
 const G2: f32 = 0.211324865;
-const G2x2: f32 = 1.0 + (2.0 * G2);
 
 /// ---------------------------------------
 /// Generate 2d Noise
@@ -204,27 +203,27 @@ pub fn generate3D (x: f32, y: f32, z: f32, perm: &[u8; 512]) -> f32 {
     let mut n: f32 = 0.0;
 
     let mut t = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
-    if (t > 0.0) {
+    if (t >= 0.0) {
         t *= t;
         n += t * t * gradient_3d(perm[(ii + perm[(jj + perm[kk as usize] as i32) as usize] as i32) as usize] as i32, x0, y0, z0);
     }
 
     t = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
-    if (t > 0.0)
+    if (t >= 0.0)
     {
         t *= t;
         n += t * t * gradient_3d(perm[(ii + i1 + perm[(jj + j1 + perm[(kk + k1) as usize] as i32) as usize] as i32) as usize] as i32, x1, y1, z1);
     }
 
     t = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
-    if (t > 0.0)
+    if (t >= 0.0)
     {
         t *= t;
         n += t * t * gradient_3d(perm[(ii + i2 + perm[(jj + j2 + perm[(kk + k2) as usize] as i32) as usize] as i32) as usize] as i32, x2, y2, z2);
     }
 
     t = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
-    if (t > 0.0) 
+    if (t >= 0.0) 
     {
         t *= t;
         n += t * t * gradient_3d(perm[(ii + 1 + perm[(jj + 1 + perm[(kk + 1) as usize] as i32) as usize] as i32) as usize] as i32, x3, y3, z3);
@@ -235,8 +234,8 @@ pub fn generate3D (x: f32, y: f32, z: f32, perm: &[u8; 512]) -> f32 {
 }
 
 fn gradient_3d(hash: i32, x: f32, y: f32, z: f32) -> f32 {
-    let h = hash & 7;
-    let u = if (h < 4) { x } else { y };
+    let h = hash & 15;
+    let u = if (h < 8) { x } else { y };
     let v = if (h < 4) { y } else { if (h == 12 || h == 14) { x } else { z } };
     (if (h & 1 != 0) { -u } else { u }) + (if (h & 2 != 0) { -v } else { v })
 }
