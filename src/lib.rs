@@ -8,6 +8,7 @@ pub struct SimplexNoise {
     octaves      : u8,
     x_frequency  : f32,
     y_frequency  : f32,
+    z_frequency  : f32,
     lacunarity   : f32,
     persistence  : f32,
 
@@ -19,11 +20,11 @@ pub struct SimplexNoise {
 
 impl SimplexNoise {
     pub fn new(
-        octaves: u8, x_frequency: f32, y_frequency: f32,
+        octaves: u8, x_frequency: f32, y_frequency: f32, z_frequency: f32,
         lacunarity: f32, persistence: f32, max: f32, min: f32, seed: u128
     ) -> Self {
-        Self { octaves, x_frequency, y_frequency, lacunarity, 
-               persistence, max, min, perm: get_perm(seed) }
+        Self { octaves, x_frequency, y_frequency, z_frequency,
+               lacunarity, persistence, max, min, perm: get_perm(seed) }
     }
 
     pub fn generate2D (&self, x: f32, y: f32) -> f32 {
@@ -53,14 +54,16 @@ impl SimplexNoise {
 
         let mut xfreq = self.x_frequency;
         let mut yfreq = self.y_frequency;
+        let mut zfreq = self.z_frequency;
         let mut amp = 1.0;
 
         for i in 0..self.octaves {
-            output += amp * simplex2d(x * xfreq, y * yfreq, &self.perm);
+            output += amp * simplex3d(x * xfreq, y * yfreq, z * zfreq, &self.perm);
             denom += amp;
 
             xfreq += self.lacunarity;
             yfreq += self.lacunarity;
+            zfreq += self.lacunarity;
 
             amp *= self.persistence;
         }

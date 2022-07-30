@@ -151,7 +151,7 @@ fn gradient(hash: u8, x: f32, y: f32) -> f32 {
 const F3: f32 = 0.333333333;
 const G3: f32 = 0.166666667;
 
-pub fn generate3D (x: f32, y: f32, z: f32, perm: &[u8; 512]) -> f32 {
+pub fn simplex3d (x: f32, y: f32, z: f32, perm: &[u8; 512]) -> f32 {
 
     let s = (x + y + z) * F3;
 
