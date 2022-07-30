@@ -1,0 +1,25 @@
+[package]
+name = "denali"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Rylan Yancey"
+]
+
+keywords = [
+    "simplex",
+    "perlin",
+    "noise",
+    "generation",
+    "procedural"
+]
+
+categories = [
+    "algorithms",
+    "mathematics"
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nanorand = "*"
