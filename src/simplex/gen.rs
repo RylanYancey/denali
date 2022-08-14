@@ -1,4 +1,8 @@
 
+// -- Credit --
+// https://github.com/SRombauts/SimplexNoise/blob/master/src/SimplexNoise.cpp
+// This code is SRombaut's C# Simplex noise implemented in Rustlang
+
 extern crate nanorand;
 use nanorand::{Pcg64, Rng};
 
@@ -37,16 +41,73 @@ pub fn get_perm(seed: u128) -> [u8; 512] {
     perm
 }
 
-const F2: f32 = 0.366025403;
-const G2: f32 = 0.211324865;
+/// ---------------------------------------
+/// Helper functions for 1d, 2d, and 3d noise.
+
+/// This function is private and is not intended to be used by an end-user.
+/// Function for simplex noise algorithm.
+/// Calculates Modulo
+#[inline(always)]
+fn modulo(x: i32, m: i32) -> usize {
+    let a = x % m;
+    if 0 > a {
+        (a + m) as usize
+    } else {
+        a as usize
+    }
+}
+
+/// Quickly finds the floor of a number faster than std can.
+#[inline(always)]
+fn fast_floor(x: f32) -> i32 {
+    if x > 0.0 {
+        x as i32
+    } else {
+        x as i32 - 1
+    }
+}
+
+/// ---------------------------------------
+/// Generate 1d Noise
+
+#[inline(always)]
+pub fn simplex1d(x: f32, perm: &[u8; 512]) -> f32
+{
+    let i0 = fast_floor(x);
+    let i1 = i0 + 1;
+    let x0 = x - i0 as f32;
+    let x1 = x0 as f32 - 1.0;
+
+    let mut n: f32 = 0.0;
+
+    let mut t = 1.0 - x0 * x0;
+    t *= t;
+    n += t * t * gradient_1d(perm[(i0 & 0xff) as usize], x0);
+
+    t = 1.0 - x1 * x1;
+    t *= t;
+    n += t * t * gradient_1d(perm[(i1 & 0xff) as usize], x1);
+    // The maximum value of this noise is 8*(3/4)^4 = 2.53125
+    // A factor of 0.395 scales to fit exactly within [-1,1]
+    return 0.395 * n;
+}
+
+#[inline]
+fn gradient_1d(hash: u8, x: f32) -> f32 {
+    let h = hash & 15;
+    let mut grad = 1.0 + (h & 7) as f32;   
+    if (h & 8) != 0 { grad = -grad; }         
+    grad * x                  
+}
 
 /// ---------------------------------------
 /// Generate 2d Noise
 
-pub fn simplex2d (mut x: f32, mut y: f32, perm: &[u8; 512]) -> f32 {
-    let mut n0: f32 = 0.0;
-    let mut n1: f32 = 0.0;
-    let mut n2: f32 = 0.0;
+const F2: f32 = 0.366025403;
+const G2: f32 = 0.211324865;
+
+#[inline(always)]
+pub fn simplex2d (x: f32, y: f32, perm: &[u8; 512]) -> f32 {
 
     let s = (x + y) * F2;
     let xs = x + s;
@@ -60,8 +121,8 @@ pub fn simplex2d (mut x: f32, mut y: f32, perm: &[u8; 512]) -> f32 {
     let x_0 = x - x_0;
     let y_0 = y - y_0;
 
-    let mut i1: i32 = 0;
-    let mut j1: i32 = 0;
+    let i1: i32;
+    let j1: i32;
     if x_0 > y_0 {
         i1 = 1;
         j1 = 0;
@@ -78,61 +139,35 @@ pub fn simplex2d (mut x: f32, mut y: f32, perm: &[u8; 512]) -> f32 {
     let ii = modulo(i, 256);
     let jj = modulo(j, 256);
 
-    let mut t0 = 0.5 - x_0 * x_0 - y_0 * y_0;
-    if t0 < 0.0 {
-        n0 = 0.0;
-    } else {
-        t0 *= t0;
-        let temp = perm[jj as usize];
-        n0 = t0 * t0 * gradient(perm[(ii + temp as i32) as usize], x_0, y_0);
+    let mut n: f32 = 0.0;
+
+    let mut t = 0.5 - x_0 * x_0 - y_0 * y_0;
+    if t >= 0.0 {
+        t *= t;
+        n += t * t * gradient_2d(perm[ii + perm[jj as usize] as usize].into(), x_0, y_0);
     }
 
-    let mut t1 = 0.5 - x1 * x1 - y1 * y1;
-    if t1 < 0.0 {
-        n1 = 0.0;
-    } else {
-        t1 *= t1;
-        let temp = perm[(jj + j1) as usize];
-        n1 = t1 * t1 * gradient(perm[(ii + i1 + temp as i32) as usize], x1, y1);
+    let mut t = 0.5 - x1 * x1 - y1 * y1;
+    if t >= 0.0 {
+        t *= t;
+        n += t * t * gradient_2d(perm[ii + i1 as usize + perm[jj + j1 as usize] as usize].into(), x1, y1);
     }
 
-    let mut t2 = 0.5 - x2 * x2 - y2 * y2;
-    if t2 < 0.0 {
-        n2 = 0.0;
-    } else {
-        t2 *= t2;
-        let temp = perm[(jj + 1) as usize];
-        n2 = t2 * t2 * gradient(perm[(ii + 1 + temp as i32) as usize], x2, y2);
+    let mut t = 0.5 - x2 * x2 - y2 * y2;
+    if t >= 0.0 {
+        t *= t;
+        n += t * t * gradient_2d(perm[ii + 1 + perm[jj + 1] as usize].into(), x2, y2);
     }
 
-    return 40.0 * (n0 + n1 + n2);
+    // returns a number in range [0, 1]
+    return 40.0 * n;
 }   
-
-/// Quickly finds the floor of a number faster than std can.
-fn fast_floor(x: f32) -> i32 {
-    if x > 0.0 {
-        return x as i32;
-    } else {
-        return (x as i32) - 1;
-    }
-}
-
-/// This function is private and is not intended to be used by an end-user.
-/// Function for simplex noise algorithm.
-/// Calculates Modulo
-fn modulo(x: i32, m: i32) -> i32 {
-    let a = x % m;
-    if 0 > a {
-        return a + m;
-    } else {
-        return a;
-    }
-}
 
 /// This function is private and is not intended to be used by an end-user.
 /// Function for simplex noise algorithm.
 /// Calculates gradients.
-fn gradient(hash: u8, x: f32, y: f32) -> f32 {
+#[inline(always)]
+fn gradient_2d(hash: u8, x: f32, y: f32) -> f32 {
     let h = hash & 7;
 
     let mut u: f32 = if 4 > h { x } else { y };
@@ -145,12 +180,14 @@ fn gradient(hash: u8, x: f32, y: f32) -> f32 {
     return u + (if h & 2 != 0 { -2.0 * v } else { 2.0 * v });
 }
 
-// - 3D NOISE - //
+/// -----------------------------------------
+/// Simplex Noise 3d 
 
 // Simple skewing factors for the 3D case
 const F3: f32 = 0.333333333;
 const G3: f32 = 0.166666667;
 
+#[inline(always)]
 pub fn simplex3d (x: f32, y: f32, z: f32, perm: &[u8; 512]) -> f32 {
 
     let s = (x + y + z) * F3;
@@ -189,9 +226,11 @@ pub fn simplex3d (x: f32, y: f32, z: f32, perm: &[u8; 512]) -> f32 {
     let x1 = x0 - i1 as f32 + G3; // Offsets for second corner in (x,y,z) coords
     let y1 = y0 - j1 as f32 + G3;
     let z1 = z0 - k1 as f32 + G3;
+
     let x2 = x0 - i2 as f32 + 2.0 * G3; // Offsets for third corner in (x,y,z) coords
     let y2 = y0 - j2 as f32 + 2.0 * G3;
     let z2 = z0 - k2 as f32 + 2.0 * G3;
+
     let x3 = x0 - 1.0 + 3.0 * G3; // Offsets for last corner in (x,y,z) coords
     let y3 = y0 - 1.0 + 3.0 * G3;
     let z3 = z0 - 1.0 + 3.0 * G3;
@@ -200,39 +239,49 @@ pub fn simplex3d (x: f32, y: f32, z: f32, perm: &[u8; 512]) -> f32 {
     let jj = modulo(j, 256);
     let kk = modulo(k, 256);
 
+    let i1 = i1 as usize;
+    let j1 = j1 as usize;
+    let k1 = k1 as usize;
+
+    let i2 = i2 as usize;
+    let j2 = j2 as usize;
+    let k2 = k2 as usize;
+
     let mut n: f32 = 0.0;
 
     let mut t = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
     if (t >= 0.0) {
         t *= t;
-        n += t * t * gradient_3d(perm[(ii + perm[(jj + perm[kk as usize] as i32) as usize] as i32) as usize] as i32, x0, y0, z0);
+        n += t * t * gradient_3d(perm[ii + perm[jj + perm[kk] as usize] as usize].into(), x0, y0, z0);
     }
 
     t = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
     if (t >= 0.0)
     {
         t *= t;
-        n += t * t * gradient_3d(perm[(ii + i1 + perm[(jj + j1 + perm[(kk + k1) as usize] as i32) as usize] as i32) as usize] as i32, x1, y1, z1);
+        n += t * t * gradient_3d(perm[ii + i1 + perm[jj + j1 + perm[kk + k1] as usize] as usize].into(), x1, y1, z1);
     }
 
     t = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
     if (t >= 0.0)
     {
         t *= t;
-        n += t * t * gradient_3d(perm[(ii + i2 + perm[(jj + j2 + perm[(kk + k2) as usize] as i32) as usize] as i32) as usize] as i32, x2, y2, z2);
+        n += t * t * gradient_3d(perm[ii + i2 + perm[jj + j2 + perm[kk + k2] as usize] as usize].into(), x2, y2, z2);
     }
 
     t = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
     if (t >= 0.0) 
     {
         t *= t;
-        n += t * t * gradient_3d(perm[(ii + 1 + perm[(jj + 1 + perm[(kk + 1) as usize] as i32) as usize] as i32) as usize] as i32, x3, y3, z3);
+        n += t * t * gradient_3d(perm[ii + 1 + perm[jj + 1 + perm[kk + 1]as usize]as usize].into(), x3, y3, z3);
     }
 
+    // returns a number in range [0, 1]
     32.0 * n
 
 }
 
+#[inline(always)]
 fn gradient_3d(hash: i32, x: f32, y: f32, z: f32) -> f32 {
     let h = hash & 15;
     let u = if (h < 8) { x } else { y };
